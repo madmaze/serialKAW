@@ -69,7 +69,8 @@ def findPeaks(data):
 	else:
 		return realPeaks
 			
-total=0.0
+totalVolt=0.0
+totalAmp=0.0
 tcnt=0
 
 def graphIt(data):
@@ -77,14 +78,26 @@ def graphIt(data):
 	VoltSense=1
 	AmpSense=0
 	MAINSVPP = 170 * 2     # +-170V is what 120Vrms ends up being (= 120*2sqrt(2))
-	VREF = 471.45          # approx ((2.4v * (10Ko/14.7Ko)) / 3
+	#MAINSVPP = 323     # +-170V is what 120Vrms ends up being (= 120*2sqrt(2))
+	# to calibrate attach no load, set CURRENTNORM to 1 and run average for a few mins
+	VREF = 470.97
+	VREF2 = 474.2
+	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
+	# then adjust the CURRENTNORM factor to get the right result
 	CURRENTNORM = 164  # conversion to amperes from ADC
+	VOLTNORM = .4943
+	
 	fig.canvas.draw()
+	
+	# init empty arrays
 	voltagedata=[0]*N_samples
 	ampdata=[0]*N_samples
+	
+	# populate our data arrays
 	for i in range(len(data)):
 		voltagedata[i]=data[i][VoltSense]
 		ampdata[i]=data[i][AmpSense]
+		
 	# get max and min voltage and normalize the curve to '0'
         # to make the graph 'AC coupled' / signed
         min_v = 1024     # XBee ADC is 10 bits, so max value is 1023
@@ -99,34 +112,46 @@ def graphIt(data):
         avgv = (max_v + min_v) / 2
         # also calculate the peak to peak measurements
         vpp =  max_v-min_v
+        print "VPP:",vpp
         
         # find peaks to get averages from
         peaks = findPeaks(data)
+        
         ave1=0.0
         ave2=0.0
-        global total
+        global totalVolt
+        global totalAmp
 	global tcnt
-        if peaks != []:
+        if peaks != [] and (peaks[1]-peaks[0]) == 37:
         	print peaks
         	i = peaks[0]
-        	x=0
         	while i < peaks[1]:
         		ave1+=voltagedata[i]
         		ave2+=ampdata[i]
-        		x+=1
         		i+=1
-		print "AVE:",x,ave1/(peaks[1]-peaks[0]),ave2/(peaks[1]-peaks[0]),(peaks[1]-peaks[0])
-		total+=ave2
-		tcnt+=x
+        	# enable for calibration
+		print "Raw AVE(volt/amp/n):",ave1/(peaks[1]-peaks[0]),ave2/(peaks[1]-peaks[0]),(peaks[1]-peaks[0])
+		totalVolt+=ave1
+		totalAmp+=ave2
+		tcnt+=(peaks[1]-peaks[0])
 	
 	vave=0.0
+	'''
         for i in range(len(voltagedata)):
             #remove 'dc bias', which we call the average read
             voltagedata[i] -= avgv
             # We know that the mains voltage is 120Vrms = +-170Vpp
             voltagedata[i] = (voltagedata[i] * MAINSVPP) / vpp
             vave+=abs(voltagedata[i])
-        
+        '''
+        for i in range(len(voltagedata)):
+            #remove 'dc bias', which we call the average read
+            voltagedata[i] -= avgv
+            # We know that the mains voltage is 120Vrms = +-170Vpp
+            voltagedata[i] = (voltagedata[i] * MAINSVPP) / vpp
+            #voltagedata[i] *= VOLTNORM
+            #voltagedata[i] /= 2
+            vave+=abs(voltagedata[i])
         
         aave=0.0
         #aave2=0.0
@@ -158,14 +183,15 @@ def graphIt(data):
         #print "aave2:",aave2/len(ampdata)
         
 def readData(event):
-	global total
+	global totalVolt
+        global totalAmp
 	global tcnt
         if s.isOpen:
 		p = s.readline().strip()
 		data = parsePacket(p)
 		if data != []:
 			graphIt(data)
-			print ">>>>>>>>>>>>Rolling average",total, total/tcnt
+			print ">>>>>>>>>>>>Rolling average",totalVolt/tcnt, totalAmp/tcnt
 		
 # Create an animated graph
 #fig = plt.figure()
