@@ -15,7 +15,7 @@ def parsePacket(packet):
 			timestep=[]
 			readings = t.split(",")
 			#print readings
-			if len(readings) == 4:
+			if len(readings) == 2:
 				for s in readings:
 					# todo: error checking/handeling 
 					if s != "":
@@ -27,7 +27,7 @@ def parsePacket(packet):
 	return data
 	
 def findPeaks(data):
-	N_samples=80
+	N_samples=160
 	VoltSense=1
 	AmpSense=0
 	window=[]
@@ -62,7 +62,7 @@ def findPeaks(data):
 			print foundPeaks
 			print realPeaks
 		else:
-			print ">>failed to identify peaks"
+			print ">>failed to identify peaks", len(foundPeaks)
 			print data
 			
 		return []
@@ -74,9 +74,10 @@ totalAmp=0.0
 tcnt=0
 
 def graphIt(data):
-	N_samples=80
-	VoltSense=1
-	AmpSense=0
+	N_samples = 160
+	WaveLength = (74*2)+1 # we want 2 waves
+	VoltSense = 1
+	AmpSense = 0
 	MAINSVPP = 170 * 2     # +-170V is what 120Vrms ends up being (= 120*2sqrt(2))
 	#MAINSVPP = 323     # +-170V is what 120Vrms ends up being (= 120*2sqrt(2))
 	# to calibrate attach no load, set CURRENTNORM to 1 and run average for a few mins
@@ -84,8 +85,8 @@ def graphIt(data):
 	VREF2 = 474.2
 	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
-	CURRENTNORM = 164  # conversion to amperes from ADC
-	VOLTNORM = .4943
+	CURRENTNORM = 158  # conversion to amperes from ADC
+	VOLTNORM = .508
 	
 	fig.canvas.draw()
 	
@@ -115,43 +116,36 @@ def graphIt(data):
         print "VPP:",vpp
         
         # find peaks to get averages from
-        peaks = findPeaks(data)
+        #peaks = findPeaks(data)
         
         ave1=0.0
         ave2=0.0
-        global totalVolt
-        global totalAmp
-	global tcnt
-        if peaks != [] and (peaks[1]-peaks[0]) == 37:
-        	print peaks
-        	i = peaks[0]
-        	while i < peaks[1]:
-        		ave1+=voltagedata[i]
-        		ave2+=ampdata[i]
-        		i+=1
-        	# enable for calibration
-		print "Raw AVE(volt/amp/n):",ave1/(peaks[1]-peaks[0]),ave2/(peaks[1]-peaks[0]),(peaks[1]-peaks[0])
-		totalVolt+=ave1
-		totalAmp+=ave2
-		tcnt+=(peaks[1]-peaks[0])
-	
+        q=0
+        for i in range(0,WaveLength):
+        	ave1 += voltagedata[i]
+        	ave2 += ampdata[i]
+        	q+=1
+        	
+        print "V/A>>>>>>>>>>", ave1/q, ave2/q, q
+
 	vave=0.0
-	'''
+
+        vmax=0
+        vmin=1024
         for i in range(len(voltagedata)):
             #remove 'dc bias', which we call the average read
-            voltagedata[i] -= avgv
+            #voltagedata[i] -= avgv
             # We know that the mains voltage is 120Vrms = +-170Vpp
-            voltagedata[i] = (voltagedata[i] * MAINSVPP) / vpp
-            vave+=abs(voltagedata[i])
-        '''
-        for i in range(len(voltagedata)):
-            #remove 'dc bias', which we call the average read
-            voltagedata[i] -= avgv
-            # We know that the mains voltage is 120Vrms = +-170Vpp
-            voltagedata[i] = (voltagedata[i] * MAINSVPP) / vpp
-            #voltagedata[i] *= VOLTNORM
+            #voltagedata[i] = (voltagedata[i] * MAINSVPP) / vpp
+            voltagedata[i] -= ave1/q
+            voltagedata[i] *= VOLTNORM
             #voltagedata[i] /= 2
-            vave+=abs(voltagedata[i])
+            if i < 149:
+            	    vave+=abs(voltagedata[i])
+            if (vmin > voltagedata[i]):
+                vmin = voltagedata[i]
+            if (vmax < voltagedata[i]):
+                vmax = voltagedata[i]
         
         aave=0.0
         #aave2=0.0
@@ -165,7 +159,7 @@ def graphIt(data):
             # the CURRENTNORM is our normalizing constant
             # that converts the ADC reading to Amperes
             ampdata[i] /= CURRENTNORM
-            if peaks != [] and i >= peaks[0] and i <= peaks[1]:
+            if i < 149:
             	    aave+=abs(ampdata[i])
             #aave2+=ampdata[i]
             
@@ -173,11 +167,13 @@ def graphIt(data):
         voltagewatchline.set_ydata(voltagedata)
         ampwatchline.set_ydata(ampdata)
         
-        if peaks != [] and (peaks[1]- peaks[0]) == 37:
-        	print "ave Amp:", aave, aave/(peaks[1]- peaks[0]),peaks[1]- peaks[0]
-        	print "ave Volt:", vave, vave/(peaks[1]- peaks[0]),peaks[1]- peaks[0]
-        	#total+=abs(ave2/(peaks[1]- peaks[0]))
-        	#tcnt+=1
+	
+        #if peaks != [] and (peaks[1]- peaks[0]) == 74:
+	print "ave Amp:", aave, aave/149
+	print "ave Volt:", vave, vave/149, vmin, vmax
+	print vmax/sqrt(2)
+	#total+=abs(ave2/(peaks[1]- peaks[0]))
+	#tcnt+=1
         	
         #print "ave Volt:", vave, vave/len(ampdata)
         #print "aave2:",aave2/len(ampdata)
@@ -191,7 +187,7 @@ def readData(event):
 		data = parsePacket(p)
 		if data != []:
 			graphIt(data)
-			print ">>>>>>>>>>>>Rolling average",totalVolt/tcnt, totalAmp/tcnt
+			#print ">>>>>>>>>>>>Rolling average",totalVolt/tcnt, totalAmp/tcnt
 		
 # Create an animated graph
 #fig = plt.figure()
@@ -216,8 +212,8 @@ wattusage.set_ylabel('Watts')
 wattusage.set_ylim(0, 500)
     
 # the mains voltage and current level subplot
-mains_t = np.arange(0, 80, 1)
-voltagewatchline, = mainswatch.plot(mains_t, [0] * 80, color='blue')
+mains_t = np.arange(0, 160, 1)
+voltagewatchline, = mainswatch.plot(mains_t, [0] * 160, color='blue')
 mainswatch.set_ylabel('Volts')
 mainswatch.set_xlabel('Sample #')
 mainswatch.set_ylim(-200, 200)
@@ -225,7 +221,7 @@ mainswatch.set_ylim(-200, 200)
 
 # make a second axies for amp data
 mainsampwatcher = mainswatch.twinx()
-ampwatchline, = mainsampwatcher.plot(mains_t, [0] * 80, color='green')
+ampwatchline, = mainsampwatcher.plot(mains_t, [0] * 160, color='green')
 mainsampwatcher.set_ylabel('Amps')
 mainsampwatcher.set_ylim(-15, 15)
 #mainsampwatcher.set_ylim(100, 800)
