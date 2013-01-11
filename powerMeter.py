@@ -85,8 +85,8 @@ def graphIt(data):
 	VREF2 = 474.2
 	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
-	CURRENTNORM = 158  # conversion to amperes from ADC
-	VOLTNORM = .508
+	CURRENTNORM = 156  # conversion to amperes from ADC
+	VOLTNORM = .50
 	
 	fig.canvas.draw()
 	
@@ -149,6 +149,7 @@ def graphIt(data):
         
         aave=0.0
         #aave2=0.0
+        wattdata=[0] * 149
         # normalize current readings to amperes
         for i in range(len(ampdata)):
             
@@ -161,7 +162,13 @@ def graphIt(data):
             ampdata[i] /= CURRENTNORM
             if i < 149:
             	    aave+=abs(ampdata[i])
+            	    wattdata[i] = ampdata[i] * voltagedata[i]
             #aave2+=ampdata[i]
+        
+        wattAve=0.0
+        for w in wattdata:
+        	wattAve+=w
+        wattAve /= len(wattdata)
             
 	wattusageline.set_ydata(avgwattdata)
         voltagewatchline.set_ydata(voltagedata)
@@ -171,6 +178,7 @@ def graphIt(data):
         #if peaks != [] and (peaks[1]- peaks[0]) == 74:
 	print "ave Amp:", aave, aave/149
 	print "ave Volt:", vave, vave/149, vmin, vmax
+	print "ave Watt:", wattAve
 	print vmax/sqrt(2)
 	#total+=abs(ave2/(peaks[1]- peaks[0]))
 	#tcnt+=1
