@@ -72,6 +72,7 @@ def findPeaks(data):
 totalVolt=0.0
 totalAmp=0.0
 tcnt=0
+avgwattdataidx=0
 
 def graphIt(data):
 	N_samples = 160
@@ -169,6 +170,20 @@ def graphIt(data):
         for w in wattdata:
         	wattAve+=w
         wattAve /= len(wattdata)
+        
+        global avgwattdataidx
+        # Add the current watt usage to our graph history
+        avgwattdata[avgwattdataidx] = wattAve
+        avgwattdataidx += 1
+        if (avgwattdataidx >= len(avgwattdata)):
+            # If we're running out of space, shift the first 10% out
+            tenpercent = int(len(avgwattdata)*0.1)
+            for i in range(len(avgwattdata) - tenpercent):
+                avgwattdata[i] = avgwattdata[i+tenpercent]
+            for i in range(len(avgwattdata) - tenpercent, len(avgwattdata)):
+                avgwattdata[i] = 0
+            avgwattdataidx = len(avgwattdata) - tenpercent
+            
             
 	wattusageline.set_ydata(avgwattdata)
         voltagewatchline.set_ydata(voltagedata)
@@ -217,7 +232,7 @@ avgwattdataidx = 0 # which point in the array we're entering new data
 watt_t = np.arange(0, len(avgwattdata), 1)
 wattusageline, = wattusage.plot(watt_t, avgwattdata)
 wattusage.set_ylabel('Watts')
-wattusage.set_ylim(0, 500)
+wattusage.set_ylim(0, 100)
     
 # the mains voltage and current level subplot
 mains_t = np.arange(0, 160, 1)
