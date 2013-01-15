@@ -4,6 +4,7 @@ import serial
 import wx
 import numpy as np
 import matplotlib
+import math
 matplotlib.use('WXAgg') # do this before importing pylab
 from pylab import *
 
@@ -79,21 +80,20 @@ def graphIt(data):
 	WaveLength = (74*2)+1 # we want 2 waves
 	VoltSense = 1
 	AmpSense = 0
-	MAINSVPP = 170 * 2     # +-170V is what 120Vrms ends up being (= 120*2sqrt(2))
-	#MAINSVPP = 323     # +-170V is what 120Vrms ends up being (= 120*2sqrt(2))
 	# to calibrate attach no load, set CURRENTNORM to 1 and run average for a few mins
 	VREF = 470.97
 	VREF2 = 474.2
 	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
 	CURRENTNORM = 156  # conversion to amperes from ADC
-	VOLTNORM = .50
+	VOLTNORM = .479
 	
 	fig.canvas.draw()
 	
 	# init empty arrays
 	voltagedata=[0]*N_samples
 	ampdata=[0]*N_samples
+	vRMS=0.0
 	
 	# populate our data arrays
 	for i in range(len(data)):
@@ -143,13 +143,18 @@ def graphIt(data):
             #voltagedata[i] /= 2
             if i < 149:
             	    vave+=abs(voltagedata[i])
+            	    vRMS+=voltagedata[i]**2
             if (vmin > voltagedata[i]):
                 vmin = voltagedata[i]
             if (vmax < voltagedata[i]):
                 vmax = voltagedata[i]
         
+        #this gives us the mean of the sum of squares
+        # then sqrt to get the RMS
+        vRMS /= 149
+        vRMS = math.sqrt(vRMS)
+        
         aave=0.0
-        #aave2=0.0
         wattdata=[0] * 149
         # normalize current readings to amperes
         for i in range(len(ampdata)):
@@ -163,8 +168,8 @@ def graphIt(data):
             ampdata[i] /= CURRENTNORM
             if i < 149:
             	    aave+=abs(ampdata[i])
-            	    wattdata[i] = abs(ampdata[i]) * abs(voltagedata[i])
-            #aave2+=ampdata[i]
+            	    #wattdata[i] = abs(ampdata[i]) * abs(voltagedata[i])
+            	    wattdata[i] = ampdata[i] * voltagedata[i]
         
         wattAve=0.0
         for w in wattdata:
@@ -194,12 +199,10 @@ def graphIt(data):
 	print "ave Amp:", aave, aave/149
 	print "ave Volt:", vave, vave/149, vmin, vmax
 	print "ave Watt:", wattAve
-	print vmax/sqrt(2)
-	#total+=abs(ave2/(peaks[1]- peaks[0]))
-	#tcnt+=1
-        	
-        #print "ave Volt:", vave, vave/len(ampdata)
-        #print "aave2:",aave2/len(ampdata)
+	print vmax/sqrt(2), vRMS
+	if wattAve > 100:
+		plt.savefig("test.png")
+		exit()
         
 def readData(event):
 	global totalVolt
@@ -210,7 +213,6 @@ def readData(event):
 		data = parsePacket(p)
 		if data != []:
 			graphIt(data)
-			#print ">>>>>>>>>>>>Rolling average",totalVolt/tcnt, totalAmp/tcnt
 		
 # Create an animated graph
 #fig = plt.figure()
