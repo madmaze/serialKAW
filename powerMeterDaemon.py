@@ -50,7 +50,7 @@ def processData(data):
 	VREF2 = 474.2
 	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
-	CURRENTNORM = 0.00641  # conversion to amperes from ADC
+	CURRENTNORM = 0.00578  # conversion to amperes from ADC
 	VOLTNORM = 0.479 # conversion to volts from ADC
 	
 	if plotGraph:
