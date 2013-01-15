@@ -1,10 +1,13 @@
 #!/usr/bin/env python
+
+# Math and Serial imports
+import numpy as np
+import math
 import serial
 
+# GRAPHING imports
 import wx
-import numpy as np
 import matplotlib
-import math
 matplotlib.use('WXAgg') # do this before importing pylab
 from pylab import *
 
@@ -26,7 +29,8 @@ def parsePacket(packet):
 		print "Skipped packet:",packet
 		
 	return data
-			
+
+# Globals.. still needed?	
 totalVolt=0.0
 totalAmp=0.0
 tcnt=0
@@ -34,7 +38,7 @@ avgwattdataidx=0
 
 def graphIt(data):
 	N_samples = 160
-	WaveLength = (74*2)+1 # we want 2 waves
+	WaveLength = (74*2)+1 # we want 2 waves to even out random noise.. 149 samples is good
 	VoltSense = 1
 	AmpSense = 0
 	# to calibrate attach no load, set CURRENTNORM to 1 and run average for a few mins
@@ -43,7 +47,7 @@ def graphIt(data):
 	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
 	CURRENTNORM = 156  # conversion to amperes from ADC
-	VOLTNORM = .479
+	VOLTNORM = .479 # conversion to volts from ADC
 	
 	fig.canvas.draw()
 	
@@ -56,55 +60,31 @@ def graphIt(data):
 	for i in range(len(data)):
 		voltagedata[i]=data[i][VoltSense]
 		ampdata[i]=data[i][AmpSense]
-		
-	# get max and min voltage and normalize the curve to '0'
-        # to make the graph 'AC coupled' / signed
-        min_v = 1024     # XBee ADC is 10 bits, so max value is 1023
-        max_v = 0
-        for i in range(len(voltagedata)):
-            if (min_v > voltagedata[i]):
-                min_v = voltagedata[i]
-            if (max_v < voltagedata[i]):
-                max_v = voltagedata[i]
-
-        # figure out the 'average' of the max and min readings
-        avgv = (max_v + min_v) / 2
-        # also calculate the peak to peak measurements
-        vpp =  max_v-min_v
-        print "VPP:",vpp
         
         # find peaks to get averages from
-        
         ave1=0.0
         ave2=0.0
-        q=0
         for i in range(0,WaveLength):
         	ave1 += voltagedata[i]
         	ave2 += ampdata[i]
-        	q+=1
         	
-        print "V/A>>>>>>>>>>", ave1/q, ave2/q, q
+        print "V/A>>>>>>>>>>", ave1/WaveLength, ave2/WaveLength, WaveLength
 
 	vave=0.0
-
-        vmax=0
-        vmin=1024
         for i in range(len(voltagedata)):
-            #remove 'dc bias', which we call the average read
-            #voltagedata[i] -= avgv
-            # We know that the mains voltage is 120Vrms = +-170Vpp
-            #voltagedata[i] = (voltagedata[i] * MAINSVPP) / vpp
-            voltagedata[i] -= ave1/q
+            # subtract average/remove DC bias
+            voltagedata[i] -= ave1/WaveLength
+            # scale readings from ADC realm to real values
             voltagedata[i] *= VOLTNORM
-            #voltagedata[i] /= 2
             if i < 149:
             	    vave+=abs(voltagedata[i])
+            	    # calculate V^2 for RMS
             	    vRMS+=voltagedata[i]**2
-            if (vmin > voltagedata[i]):
-                vmin = voltagedata[i]
-            if (vmax < voltagedata[i]):
-                vmax = voltagedata[i]
         
+        # get peakVoltages
+	vmax = max(voltagedata)
+	vmin = min(voltagedata)
+	
         #this gives us the mean of the sum of squares
         # then sqrt to get the RMS
         vRMS /= 149
@@ -124,7 +104,6 @@ def graphIt(data):
             ampdata[i] /= CURRENTNORM
             if i < 149:
             	    aave+=abs(ampdata[i])
-            	    #wattdata[i] = abs(ampdata[i]) * abs(voltagedata[i])
             	    wattdata[i] = ampdata[i] * voltagedata[i]
         
         wattAve=0.0
@@ -150,14 +129,14 @@ def graphIt(data):
         voltagewatchline.set_ydata(voltagedata)
         ampwatchline.set_ydata(ampdata)
         
-	
-        #if peaks != [] and (peaks[1]- peaks[0]) == 74:
+        # Debug Info
 	print "ave Amp:", aave, aave/149
 	print "ave Volt:", vave, vave/149, vmin, vmax
+	print "rms/trueRMS Volt", vmax/sqrt(2), vRMS
 	print "ave Watt:", wattAve
-	print vmax/sqrt(2), vRMS
 	if wattAve > 100:
 		plt.savefig("test.png")
+		print "I think we may have come across an odd spike.. exiting and saving plot"
 		exit()
         
 def readData(event):
@@ -169,15 +148,11 @@ def readData(event):
 		data = parsePacket(p)
 		if data != []:
 			graphIt(data)
-		
-# Create an animated graph
-#fig = plt.figure()
-# with three subplots: line voltage/current, watts and watthr
-#wattusage = fig.add_subplot(211)
-#mainswatch = fig.add_subplot(212)
 
+# Setup code mostly borrowed from Adafruit's wattagePlotter.py 
 # Create an animated graph
 fig = plt.figure()
+
 # with three subplots: line voltage/current, watts and watthr
 wattusage = fig.add_subplot(211)
 mainswatch = fig.add_subplot(212)
@@ -198,14 +173,12 @@ voltagewatchline, = mainswatch.plot(mains_t, [0] * 160, color='blue')
 mainswatch.set_ylabel('Volts')
 mainswatch.set_xlabel('Sample #')
 mainswatch.set_ylim(-200, 200)
-#mainswatch.set_ylim(100, 850)
 
 # make a second axies for amp data
 mainsampwatcher = mainswatch.twinx()
 ampwatchline, = mainsampwatcher.plot(mains_t, [0] * 160, color='green')
 mainsampwatcher.set_ylabel('Amps')
 mainsampwatcher.set_ylim(-15, 15)
-#mainsampwatcher.set_ylim(100, 800)
 
 # and a legend for both of them
 legend((voltagewatchline, ampwatchline), ('volts', 'amps'))
@@ -217,10 +190,3 @@ timer = wx.Timer(wx.GetApp(), -1)
 timer.Start(250)        # run an in every 'n' milli-seconds
 wx.GetApp().Bind(wx.EVT_TIMER, readData)
 plt.show()
-
-'''while s.isOpen:
-	p = s.readline().strip()
-	data = parsePacket(p)
-	if data != []:
-		graphIt(data)
-		'''
