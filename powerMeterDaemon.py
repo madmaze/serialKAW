@@ -50,8 +50,8 @@ def processData(data):
 	VREF2 = 474.2
 	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
-	CURRENTNORM = 156  # conversion to amperes from ADC
-	VOLTNORM = .479 # conversion to volts from ADC
+	CURRENTNORM = 0.00641  # conversion to amperes from ADC
+	VOLTNORM = 0.479 # conversion to volts from ADC
 	
 	if plotGraph:
 		fig.canvas.draw()
@@ -60,6 +60,7 @@ def processData(data):
 	voltagedata=[0]*N_samples
 	ampdata=[0]*N_samples
 	vRMS=0.0
+	aRMS=0.0
 	
 	# populate our data arrays
 	for i in range(len(data)):
@@ -106,10 +107,21 @@ def processData(data):
             ampdata[i] -= VREF
             # the CURRENTNORM is our normalizing constant
             # that converts the ADC reading to Amperes
-            ampdata[i] /= CURRENTNORM
+            ampdata[i] *= CURRENTNORM
             if i < 149:
             	    aave+=abs(ampdata[i])
+            	    aRMS+=ampdata[i]**2
             	    wattdata[i] = ampdata[i] * voltagedata[i]
+        ###
+        # this gives us the mean of the sum of squares
+        # then sqrt to get the RMS
+        # RMS Amps:
+        aRMS /= 149
+        aRMS = math.sqrt(aRMS)
+        # RMS Volts:
+        vRMS /= 149
+        vRMS = math.sqrt(vRMS)
+        ###
         
         wattAve=0.0
         for w in wattdata:
@@ -135,7 +147,7 @@ def processData(data):
 		ampwatchline.set_ydata(ampdata)
         
         # Debug Info
-	print "\nave Amp:", aave, aave/149
+	print "\nave Amp:", aave, aave/149, aRMS
 	print "ave Volt:", vave, vave/149, vmin, vmax
 	print "rms/trueRMS Volt", vmax/math.sqrt(2), vRMS
 	print "ave Watt:", wattAve
