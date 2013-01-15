@@ -26,49 +26,6 @@ def parsePacket(packet):
 		print "Skipped packet:",packet
 		
 	return data
-	
-def findPeaks(data):
-	N_samples=160
-	VoltSense=1
-	AmpSense=0
-	window=[]
-	foundPeaks=[]
-	for i in range(len(data)):
-		window.append(data[i][VoltSense])
-		if len(window) > 5:
-			window.pop(0)
-		if len(window) == 5:
-			if window[0] < window[2] and window[1] <= window[2]:
-				#print "found uphill"
-				if window[2] >= window[3] and window[2] > window[4]:
-					#print "found peak:",window,i-2
-					foundPeaks.append((window,i-2))
-	print "found %s peaks" % (len(foundPeaks))
-	
-	realPeaks=[]
-	# collapse adjacent peaks ie 10,11,48 => 10,48
-	# we choose the first of each pair
-	for i in range(len(foundPeaks)):
-		if i < len(foundPeaks)-1 and foundPeaks[i][1] == foundPeaks[i+1][1]-1:
-			realPeaks.append(foundPeaks[i][1])
-		elif i < len(foundPeaks)-1 and i == 0 and foundPeaks[i][1] != foundPeaks[i+1][1]-1:
-			realPeaks.append(foundPeaks[i][1])
-		elif i > 0 and foundPeaks[i-1][1] != foundPeaks[i][1]-1:
-			realPeaks.append(foundPeaks[i][1])
-
-	
-	if len(realPeaks) != 2:
-		if len(foundPeaks) >= 3:
-			print "Interesting.. do we have triple readings?"
-			print foundPeaks
-			print realPeaks
-		else:
-			print ">>failed to identify peaks", len(foundPeaks)
-			print data
-			
-		return []
-	else:
-		return realPeaks
 			
 totalVolt=0.0
 totalAmp=0.0
@@ -117,7 +74,6 @@ def graphIt(data):
         print "VPP:",vpp
         
         # find peaks to get averages from
-        #peaks = findPeaks(data)
         
         ave1=0.0
         ave2=0.0
