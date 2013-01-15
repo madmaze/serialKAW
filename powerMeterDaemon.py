@@ -147,7 +147,7 @@ def processData(data):
 		ampwatchline.set_ydata(ampdata)
         
         # Debug Info
-	print "\nave Amp:", aave, aave/149, aRMS
+	print "\nave Amp(ave/RMS):", aave, aave/149, aRMS
 	print "ave Volt:", vave, vave/149, vmin, vmax
 	print "rms/trueRMS Volt", vmax/math.sqrt(2), vRMS
 	print "ave Watt:", wattAve
