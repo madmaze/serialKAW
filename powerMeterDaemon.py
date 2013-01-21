@@ -13,6 +13,7 @@ totalAmp=0.0
 tcnt=0
 avgwattdataidx=0
 plotGraph=True
+CALIBRATE=False
 
 if plotGraph:
 	# GRAPHING imports
@@ -39,19 +40,50 @@ def parsePacket(packet):
 		print "Skipped packet:",packet
 		
 	return data
+
+def calibrateADC(data):
+	# to calibrate, set CALIBRATE to True and run it for a few minutes.
+	# then fill in the calculated VREF and VREF2
+	WaveLength = (74*2)+1 # we want 2 waves to even out random noise.. 149 samples is good enough
+	VoltSense = 1
+	AmpSense = 0
+	
+	N_samples = 160
+	# init empty arrays
+	voltagedata=[0]*N_samples
+	ampdata=[0]*N_samples
+	
+	global totalVolt
+	global totalAmp
+	global tcnt
+	
+	# populate our data arrays
+	for i in range(len(data)):
+		voltagedata[i]=data[i][VoltSense]
+		ampdata[i]=data[i][AmpSense]
+	
+	for i in range(0,WaveLength):
+        	totalVolt += voltagedata[i]
+        	totalAmp += ampdata[i]
+        tcnt+=WaveLength
+        print "VREF:",totalVolt/tcnt
+        print "VREF2:",totalAmp/tcnt
+		
+		
+	
 	
 def processData(data):
 	N_samples = 160
-	WaveLength = (74*2)+1 # we want 2 waves to even out random noise.. 149 samples is good
+	WaveLength = (74*2)+1 # we want 2 waves to even out random noise.. 149 samples is good enough
 	VoltSense = 1
 	AmpSense = 0
-	# to calibrate attach no load, set CURRENTNORM to 1 and run average for a few mins
-	VREF = 470.97
-	VREF2 = 474.2
-	# to calibrate, first calibrate VREF then attach a load and view the AMP out put on the display
+	# to calibrate attach no load, set CALIBRATE to True and run for a few mins then fill in below
+	VREF = 471.73
+	VREF2 = 475.02
+	# First calibrate VREF (above) then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
-	CURRENTNORM = 0.00578  # conversion to amperes from ADC
-	VOLTNORM = 0.479 # conversion to volts from ADC
+	CURRENTNORM = 0.0057  # conversion to amperes from ADC
+	VOLTNORM = 0.476 # conversion to volts from ADC
 	
 	if plotGraph:
 		fig.canvas.draw()
@@ -90,11 +122,6 @@ def processData(data):
         # get peakVoltages
 	vmax = max(voltagedata)
 	vmin = min(voltagedata)
-	
-        #this gives us the mean of the sum of squares
-        # then sqrt to get the RMS
-        vRMS /= 149
-        vRMS = math.sqrt(vRMS)
         
         aave=0.0
         wattdata=[0] * 149
@@ -167,7 +194,10 @@ def readData():
 		p = s.readline().strip()
 		data = parsePacket(p)
 		if data != []:
-			processData(data)
+			if CALIBRATE:
+				calibrateADC(data)
+			else:
+				processData(data)
 			
 	if plotGraph is False:
 		Timer(0.25,readData).start()
