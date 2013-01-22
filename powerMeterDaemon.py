@@ -38,10 +38,13 @@ class powerMeter():
 	# init data point counter for wattage plotting
 	avgwattdataidx=0
 	
-	def __init__(self, Calibrate=False, plotGraph=True, debug=False):
+	outFile="test.log"
+	
+	def __init__(self, Calibrate=False, plotGraph=True, debug=False, record=True):
 		self.CALIBRATE=Calibrate
 		self.plotGraph=plotGraph
 		self.debug=debug
+		self.record=record
 
 		# average Watt data
 		self.avgwattdata = [0] * 1800 # zero out all the data to start
@@ -213,6 +216,9 @@ class powerMeter():
 		else:
 			print "Volt/Amp/Watt:", aRMS, vRMS, wattAve 
 		
+		if self.record:
+			self.writeData(aRMS, vRMS, wattAve)
+		
 		#if wattAve > 100:
 		#	plt.savefig("test.png")
 		#	print "I think we may have come across an odd spike.. exiting and saving plot"
@@ -221,6 +227,11 @@ class powerMeter():
 		# update Graph
 		if self.plotGraph:
 			self.fig.canvas.draw()
+	
+	def writeData(self,aRMS, vRMS, wattAve):
+		f = open(self.outFile,"a")
+		f.write(str(aRMS)+" "+str(vRMS)+" "+str(wattAve)+"\n")
+		f.close()
 		
 	def readDataEvent(self, event):
 		self.readData()
