@@ -38,9 +38,10 @@ class powerMeter():
 	# init data point counter for wattage plotting
 	avgwattdataidx=0
 	
-	def __init__(self, Calibrate=False, plotGraph=True):
+	def __init__(self, Calibrate=False, plotGraph=True, debug=False):
 		self.CALIBRATE=Calibrate
 		self.plotGraph=plotGraph
+		self.debug=debug
 
 		# average Watt data
 		self.avgwattdata = [0] * 1800 # zero out all the data to start
@@ -204,10 +205,13 @@ class powerMeter():
 			self.ampwatchline.set_ydata(ampdata)
 		
 		# Debug Info
-		print "\nave Amp(ave/RMS):", aave, aave / self.WaveLength, aRMS
-		print "ave Volt:", vave, vave / self.WaveLength, vmin, vmax
-		print "rms/trueRMS Volt", vmax / math.sqrt(2), vRMS
-		print "ave Watt:", wattAve
+		if self.debug:
+			print "\nave Amp(ave/RMS):", aave, aave / self.WaveLength, aRMS
+			print "ave Volt:", vave, vave / self.WaveLength, vmin, vmax
+			print "rms/trueRMS Volt", vmax / math.sqrt(2), vRMS
+			print "ave Watt:", wattAve
+		else:
+			print "Volt/Amp/Watt:", aRMS, vRMS, wattAve 
 		
 		#if wattAve > 100:
 		#	plt.savefig("test.png")
