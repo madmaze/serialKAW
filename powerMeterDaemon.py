@@ -1,251 +1,242 @@
 #!/usr/bin/env python
 
-# Misc imports
+# Basic imports
 import numpy as np
 import math
 import serial
 from threading import Timer 
 
+# GRAPHING imports
+import wx
+import matplotlib
+matplotlib.use('WXAgg') # do this before importing pylab
+from pylab import *
 
-# Globals.. still needed?	
-totalVolt=0.0
-totalAmp=0.0
-tcnt=0
-avgwattdataidx=0
-plotGraph=True
-CALIBRATE=False
-
-if plotGraph:
-	# GRAPHING imports
-	import wx
-	import matplotlib
-	matplotlib.use('WXAgg') # do this before importing pylab
-	from pylab import *
-
-def parsePacket(packet):
-	data=[]
-	if len(packet)>10 and "\x00" not in packet:
-		T = packet.split(";")
-		for t in T:
-			timestep=[]
-			readings = t.split(",")
-			#print readings
-			if len(readings) == 2:
-				for s in readings:
-					# todo: error checking/handeling 
-					if s != "":
-						timestep.append(int(s))
-				data.append(timestep)
-	else:
-		print "Skipped packet:",packet
-		
-	return data
-
-def calibrateADC(data):
-	# to calibrate, set CALIBRATE to True and run it for a few minutes.
-	# then fill in the calculated VREF and VREF2
+class powerMeter():
+	# samples we expect from the arduino
+	N_samples = 160
 	WaveLength = (74*2)+1 # we want 2 waves to even out random noise.. 149 samples is good enough
+	
+	# which ADC pins are we talking to?
 	VoltSense = 1
 	AmpSense = 0
 	
-	N_samples = 160
-	# init empty arrays
-	voltagedata=[0]*N_samples
-	ampdata=[0]*N_samples
-	
-	global totalVolt
-	global totalAmp
-	global tcnt
-	
-	# populate our data arrays
-	for i in range(len(data)):
-		voltagedata[i]=data[i][VoltSense]
-		ampdata[i]=data[i][AmpSense]
-	
-	for i in range(0,WaveLength):
-        	totalVolt += voltagedata[i]
-        	totalAmp += ampdata[i]
-        tcnt+=WaveLength
-        print "VREF:",totalVolt/tcnt
-        print "VREF2:",totalAmp/tcnt
-		
-		
-	
-	
-def processData(data):
-	N_samples = 160
-	WaveLength = (74*2)+1 # we want 2 waves to even out random noise.. 149 samples is good enough
-	VoltSense = 1
-	AmpSense = 0
 	# to calibrate attach no load, set CALIBRATE to True and run for a few mins then fill in below
 	VREF = 471.73
 	VREF2 = 475.02
+	
 	# First calibrate VREF (above) then attach a load and view the AMP out put on the display
 	# then adjust the CURRENTNORM factor to get the right result
 	CURRENTNORM = 0.0057  # conversion to amperes from ADC
 	VOLTNORM = 0.476 # conversion to volts from ADC
 	
-	if plotGraph:
-		fig.canvas.draw()
+	# Calibration counters
+	totalVolt=0.0
+	totalAmp=0.0
+	tcnt=0
 	
-	# init empty arrays
-	voltagedata=[0]*N_samples
-	ampdata=[0]*N_samples
-	vRMS=0.0
-	aRMS=0.0
+	# init data point counter for wattage plotting
+	avgwattdataidx=0
 	
-	# populate our data arrays
-	for i in range(len(data)):
-		voltagedata[i]=data[i][VoltSense]
-		ampdata[i]=data[i][AmpSense]
-        
-        # find peaks to get averages from
-        ave1=0.0
-        ave2=0.0
-        for i in range(0,WaveLength):
-        	ave1 += voltagedata[i]
-        	ave2 += ampdata[i]
-        	
-        #print "V/A>>>>>>>>>>", ave1/WaveLength, ave2/WaveLength, WaveLength
+	def __init__(self, Calibrate=False, plotGraph=True):
+		self.CALIBRATE=Calibrate
+		self.plotGraph=plotGraph
 
-	vave=0.0
-        for i in range(len(voltagedata)):
-            # subtract average/remove DC bias
-            voltagedata[i] -= ave1/WaveLength
-            # scale readings from ADC realm to real values
-            voltagedata[i] *= VOLTNORM
-            if i < 149:
-            	    vave+=abs(voltagedata[i])
-            	    # calculate V^2 for RMS
-            	    vRMS+=voltagedata[i]**2
-        
-        # get peakVoltages
-	vmax = max(voltagedata)
-	vmin = min(voltagedata)
-        
-        aave=0.0
-        wattdata=[0] * 149
-        # normalize current readings to amperes
-        for i in range(len(ampdata)):
-            
-            # VREF is the hardcoded 'DC bias' value, its
-            # about 492 but would be nice if we could somehow
-            # get this data once in a while maybe using xbeeAPI
-            ampdata[i] -= VREF
-            # the CURRENTNORM is our normalizing constant
-            # that converts the ADC reading to Amperes
-            ampdata[i] *= CURRENTNORM
-            if i < 149:
-            	    aave+=abs(ampdata[i])
-            	    aRMS+=ampdata[i]**2
-            	    wattdata[i] = ampdata[i] * voltagedata[i]
-        ###
-        # this gives us the mean of the sum of squares
-        # then sqrt to get the RMS
-        # RMS Amps:
-        aRMS /= 149
-        aRMS = math.sqrt(aRMS)
-        # RMS Volts:
-        vRMS /= 149
-        vRMS = math.sqrt(vRMS)
-        ###
-        
-        wattAve=0.0
-        for w in wattdata:
-        	wattAve+=w
-        wattAve /= len(wattdata)
-        
-        global avgwattdataidx
-        # Add the current watt usage to our graph history
-        avgwattdata[avgwattdataidx] = wattAve
-        avgwattdataidx += 1
-        if (avgwattdataidx >= len(avgwattdata)):
-            # If we're running out of space, shift the first 10% out
-            tenpercent = int(len(avgwattdata)*0.1)
-            for i in range(len(avgwattdata) - tenpercent):
-                avgwattdata[i] = avgwattdata[i+tenpercent]
-            for i in range(len(avgwattdata) - tenpercent, len(avgwattdata)):
-                avgwattdata[i] = 0
-            avgwattdataidx = len(avgwattdata) - tenpercent
-            
-        if plotGraph:
-		wattusageline.set_ydata(avgwattdata)
-		voltagewatchline.set_ydata(voltagedata)
-		ampwatchline.set_ydata(ampdata)
-        
-        # Debug Info
-	print "\nave Amp(ave/RMS):", aave, aave/149, aRMS
-	print "ave Volt:", vave, vave/149, vmin, vmax
-	print "rms/trueRMS Volt", vmax/math.sqrt(2), vRMS
-	print "ave Watt:", wattAve
-	if wattAve > 100:
-		plt.savefig("test.png")
-		print "I think we may have come across an odd spike.. exiting and saving plot"
-		exit()
-        
-def readDataEvent(event):
-	readData()
+		# average Watt data
+		self.avgwattdata = [0] * 1800 # zero out all the data to start
 		
-def readData():
-	global totalVolt
-        global totalAmp
-	global tcnt
-        if s.isOpen:
-		p = s.readline().strip()
-		data = parsePacket(p)
-		if data != []:
-			if CALIBRATE:
-				calibrateADC(data)
-			else:
-				processData(data)
+		if plotGraph:
+			# Setup code mostly borrowed from Adafruit's wattagePlotter.py 
+			# Create an animated graph
+			self.fig = plt.figure()
 			
-	if plotGraph is False:
-		Timer(0.25,readData).start()
+			# with three subplots: line voltage/current, watts and watthr
+			self.wattusage = self.fig.add_subplot(211)
+			self.mainswatch = self.fig.add_subplot(212)
+			
+			# The watt subplot
+			self.watt_t = np.arange(0, len(self.avgwattdata), 1)
+			self.wattusageline, = self.wattusage.plot(self.watt_t, self.avgwattdata)
+			self.wattusage.set_ylabel('Watts')
+			self.wattusage.set_ylim(0, 100)
+			    
+			# the mains voltage and current level subplot
+			self.mains_t = np.arange(0, 160, 1)
+			self.voltagewatchline, = self.mainswatch.plot(self.mains_t, [0] * 160, color='blue')
+			self.mainswatch.set_ylabel('Volts')
+			self.mainswatch.set_xlabel('Sample #')
+			self.mainswatch.set_ylim(-200, 200)
+			
+			# make a second axies for amp data
+			self.mainsampwatcher = self.mainswatch.twinx()
+			self.ampwatchline, = self.mainsampwatcher.plot(self.mains_t, [0] * 160, color='green')
+			self.mainsampwatcher.set_ylabel('Amps')
+			self.mainsampwatcher.set_ylim(-15, 15)
+			
+			# and a legend for both of them
+			legend((self.voltagewatchline, self.ampwatchline), ('volts', 'amps'))
+		
+		self.s = serial.Serial(port='/dev/ttyUSB0',baudrate=115200)
+		self.s.open()
+		
+		if plotGraph:
+			print "Setting up graphs.."
+			timer = wx.Timer(wx.GetApp(), -1)
+			timer.Start(250)        # run an in every 'n' milli-seconds
+			wx.GetApp().Bind(wx.EVT_TIMER, self.readDataEvent)
+			plt.show()
+		else:
+			self.readData()
+	
+	def parsePacket(self, packet):
+		data = []
+		if len(packet)>10 and "\x00" not in packet:
+			T = packet.split(";")
+			for t in T:
+				timestep = []
+				readings = t.split(",")
+				if len(readings) == 2:
+					for s in readings:
+						# todo: error checking/handeling 
+						if s != "":
+							timestep.append(int(s))
+					data.append(timestep)
+		else:
+			print "Skipped packet:",packet
+			
+		return data
+	
+	def calibrateADC(self, data):		
+		# init empty arrays
+		voltagedata = [0] * self.N_samples
+		ampdata = [0] * self.N_samples
+		
+		# populate our data arrays
+		for i in range( len(data) ):
+			voltagedata[i] = data[i][self.VoltSense]
+			ampdata[i] = data[i][self.AmpSense]
+		
+		for i in range(0, self.WaveLength):
+			self.totalVolt += voltagedata[i]
+			self.totalAmp += ampdata[i]
+			
+		self.tcnt += self.WaveLength
+		print "VREF:", self.totalVolt / self.tcnt
+		print "VREF2:", self.totalAmp / self.tcnt
+			
+			
+		
+		
+	def processData(self, data):
+		# init empty arrays
+		voltagedata = [0] * self.N_samples
+		ampdata = [0] * self.N_samples
+		
+		vRMS = 0.0
+		aRMS = 0.0
+		
+		# populate our data arrays
+		for i in range( len(data)):
+			voltagedata[i] = data[i][self.VoltSense]
+			ampdata[i] = data[i][self.AmpSense]
+	
+		vave = 0.0
+		for i in range( len(voltagedata)):
+		    # subtract average/remove DC bias
+		    voltagedata[i] -= self.VREF2 #ave1/self.WaveLength
+		    # scale readings from ADC realm to real values
+		    voltagedata[i] *= self.VOLTNORM
+		    
+		    if i < self.WaveLength:
+			    vave += abs(voltagedata[i])
+			    # calculate V^2 for RMS
+			    vRMS += voltagedata[i]**2
+		
+		# get peakVoltages
+		vmax = max(voltagedata)
+		vmin = min(voltagedata)
+		
+		aave = 0.0
+		wattdata = [0] * self.WaveLength
+		# normalize current readings to amperes
+		for i in range(len(ampdata)):
+		    # VREF is the hardcoded 'DC bias' value, its
+		    # about 492 but would be nice if we could somehow
+		    # get this data once in a while maybe using xbeeAPI
+		    ampdata[i] -= self.VREF
+		    # the CURRENTNORM is our normalizing constant
+		    # that converts the ADC reading to Amperes
+		    ampdata[i] *= self.CURRENTNORM
+		    
+		    if i < self.WaveLength:
+			    aave += abs(ampdata[i])
+			    aRMS += ampdata[i] ** 2
+			    wattdata[i] = ampdata[i] * voltagedata[i]
+		###
+		# this gives us the mean of the sum of squares
+		# then sqrt to get the RMS
+		# RMS Amps:
+		aRMS /= self.WaveLength
+		aRMS = math.sqrt(aRMS)
+		# RMS Volts:
+		vRMS /= self.WaveLength
+		vRMS = math.sqrt(vRMS)
+		###
+		
+		wattAve = 0.0
+		for w in wattdata:
+			wattAve += w
+		wattAve /= len(wattdata)
+		
+		# Add the current watt usage to our graph history
+		self.avgwattdata[self.avgwattdataidx] = wattAve
+		self.avgwattdataidx += 1
+		
+		if (self.avgwattdataidx >= len(self.avgwattdata)):
+		    # If we're running out of space, shift the first 10% out
+		    tenpercent = int(len(self.avgwattdata)*0.1)
+		    for i in range(len(self.avgwattdata) - tenpercent):
+			self.avgwattdata[i] = self.avgwattdata[i+tenpercent]
+		    for i in range(len(self.avgwattdata) - tenpercent, len(self.avgwattdata)):
+			self.avgwattdata[i] = 0
+		    self.avgwattdataidx = len(self.avgwattdata) - tenpercent
+		    
+		if self.plotGraph:
+			self.wattusageline.set_ydata(self.avgwattdata)
+			self.voltagewatchline.set_ydata(voltagedata)
+			self.ampwatchline.set_ydata(ampdata)
+		
+		# Debug Info
+		print "\nave Amp(ave/RMS):", aave, aave / self.WaveLength, aRMS
+		print "ave Volt:", vave, vave / self.WaveLength, vmin, vmax
+		print "rms/trueRMS Volt", vmax / math.sqrt(2), vRMS
+		print "ave Watt:", wattAve
+		
+		#if wattAve > 100:
+		#	plt.savefig("test.png")
+		#	print "I think we may have come across an odd spike.. exiting and saving plot"
+		#	exit()
+		
+		# update Graph
+		if self.plotGraph:
+			self.fig.canvas.draw()
+		
+	def readDataEvent(self, event):
+		self.readData()
+			
+	def readData(self):
+		if self.s.isOpen:
+			p = self.s.readline().strip()
+			data = self.parsePacket(p)
+			if len(data) == self.N_samples:
+				if self.CALIBRATE:
+					self.calibrateADC(data)
+				else:
+					self.processData(data)
+				
+		if self.plotGraph is False:
+			Timer(0.25, readData).start()
 
-# average Watt data
-avgwattdata = [0] * 1800 # zero out all the data to start
-
-if plotGraph:
-	# Setup code mostly borrowed from Adafruit's wattagePlotter.py 
-	# Create an animated graph
-	fig = plt.figure()
+if __name__ == "__main__":
+	meter = powerMeter()
 	
-	# with three subplots: line voltage/current, watts and watthr
-	wattusage = fig.add_subplot(211)
-	mainswatch = fig.add_subplot(212)
-	
-	avgwattdataidx = 0 # which point in the array we're entering new data
-	
-	# The watt subplot
-	watt_t = np.arange(0, len(avgwattdata), 1)
-	wattusageline, = wattusage.plot(watt_t, avgwattdata)
-	wattusage.set_ylabel('Watts')
-	wattusage.set_ylim(0, 100)
-	    
-	# the mains voltage and current level subplot
-	mains_t = np.arange(0, 160, 1)
-	voltagewatchline, = mainswatch.plot(mains_t, [0] * 160, color='blue')
-	mainswatch.set_ylabel('Volts')
-	mainswatch.set_xlabel('Sample #')
-	mainswatch.set_ylim(-200, 200)
-	
-	# make a second axies for amp data
-	mainsampwatcher = mainswatch.twinx()
-	ampwatchline, = mainsampwatcher.plot(mains_t, [0] * 160, color='green')
-	mainsampwatcher.set_ylabel('Amps')
-	mainsampwatcher.set_ylim(-15, 15)
-	
-	# and a legend for both of them
-	legend((voltagewatchline, ampwatchline), ('volts', 'amps'))
-
-s = serial.Serial(port='/dev/ttyUSB0',baudrate=115200)
-s.open()
-
-if plotGraph:
-	print "Setting up graphs.."
-	timer = wx.Timer(wx.GetApp(), -1)
-	timer.Start(250)        # run an in every 'n' milli-seconds
-	wx.GetApp().Bind(wx.EVT_TIMER, readDataEvent)
-	plt.show()
-else:
-	readData()
