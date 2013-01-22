@@ -6,7 +6,7 @@ import math
 import serial
 from threading import Timer 
 
-# GRAPHING imports
+# Graphing imports
 import wx
 import matplotlib
 matplotlib.use('WXAgg') # do this before importing pylab
@@ -123,9 +123,6 @@ class powerMeter():
 		self.tcnt += self.WaveLength
 		print "VREF:", self.totalVolt / self.tcnt
 		print "VREF2:", self.totalAmp / self.tcnt
-			
-			
-		
 		
 	def processData(self, data):
 		# init empty arrays
@@ -239,4 +236,3 @@ class powerMeter():
 
 if __name__ == "__main__":
 	meter = powerMeter()
-	
