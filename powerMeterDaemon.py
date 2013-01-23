@@ -5,6 +5,7 @@ import numpy as np
 import math
 import serial
 from threading import Timer 
+from datetime import datetime
 
 # Graphing imports
 import wx
@@ -43,8 +44,9 @@ class powerMeter():
 		self.plotGraph=plotGraph
 		self.debug=debug
 		self.record=record
-		self.dataLog=[]
+		self.dataLog={}
 		self.logFile=powerLogFile
+		self.monitoring=True
 
 		# average Watt data
 		self.avgwattdata = [0] * 1800 # zero out all the data to start
@@ -217,7 +219,8 @@ class powerMeter():
 			print "Volt/Amp/Watt:", aRMS, vRMS, wattAve 
 		
 		if self.record:
-			self.recordData(aRMS, vRMS, wattAve)
+			tstamp = datetime.datetime.now()
+			self.recordData(tstamp, aRMS, vRMS, wattAve)
 		
 		#if wattAve > 100:
 		#	plt.savefig("test.png")
@@ -228,13 +231,28 @@ class powerMeter():
 		if self.plotGraph:
 			self.fig.canvas.draw()
 	
-	def recordData(self,aRMS, vRMS, wattAve):
+	def recordData(self, tstamp, aRMS, vRMS, wattAve):
+		
 		if self.logFile != "":
 			f = open(self.logFile,"a")
-			f.write(str(aRMS)+" "+str(vRMS)+" "+str(wattAve)+"\n")
+			f.write(tstamp.strftime("%Y:%m:%d-%H:%M:%S.%f") + " " + str(aRMS) + " " + str(vRMS) + " " + str(wattAve) + "\n")
 			f.close()
 		else:
-			self.dataLog.append((aRMS, vRMS, wattAve))
+			self.dataLog[str(tstamp.strftime("%Y:%m:%d-%H:%M:%S.%f"))]=(aRMS, vRMS, wattAve)
+	
+	def clearData(self):
+		self.dataLog = {}
+	
+	def stopMonitoring(self):
+		print "stopping to monitor power usage..."
+		self.monitoring=False
+	
+	def startMonitoring(self):
+		self.monitoring=True
+		self.readData()
+	
+	def getDataLog(self):
+		return self.dataLog
 		
 	def readDataEvent(self, event):
 		self.readData()
@@ -250,7 +268,8 @@ class powerMeter():
 					self.processData(data)
 				
 		if self.plotGraph is False:
-			Timer(0.25, readData).start()
+			if self.monitoring:
+				Timer(0.25, self.readData).start()
 
 if __name__ == "__main__":
-	meter = powerMeter()
+	meter = powerMeter(powerLogFile="")
