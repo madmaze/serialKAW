@@ -38,13 +38,13 @@ class powerMeter():
 	# init data point counter for wattage plotting
 	avgwattdataidx=0
 	
-	outFile="test.log"
-	
-	def __init__(self, Calibrate=False, plotGraph=True, debug=False, record=True):
+	def __init__(self, Calibrate=False, plotGraph=True, debug=False, record=True, powerLogFile="test.log"):
 		self.CALIBRATE=Calibrate
 		self.plotGraph=plotGraph
 		self.debug=debug
 		self.record=record
+		self.dataLog=[]
+		self.logFile=powerLogFile
 
 		# average Watt data
 		self.avgwattdata = [0] * 1800 # zero out all the data to start
@@ -217,7 +217,7 @@ class powerMeter():
 			print "Volt/Amp/Watt:", aRMS, vRMS, wattAve 
 		
 		if self.record:
-			self.writeData(aRMS, vRMS, wattAve)
+			self.recordData(aRMS, vRMS, wattAve)
 		
 		#if wattAve > 100:
 		#	plt.savefig("test.png")
@@ -228,10 +228,13 @@ class powerMeter():
 		if self.plotGraph:
 			self.fig.canvas.draw()
 	
-	def writeData(self,aRMS, vRMS, wattAve):
-		f = open(self.outFile,"a")
-		f.write(str(aRMS)+" "+str(vRMS)+" "+str(wattAve)+"\n")
-		f.close()
+	def recordData(self,aRMS, vRMS, wattAve):
+		if self.logFile != "":
+			f = open(self.logFile,"a")
+			f.write(str(aRMS)+" "+str(vRMS)+" "+str(wattAve)+"\n")
+			f.close()
+		else:
+			self.dataLog.append((aRMS, vRMS, wattAve))
 		
 	def readDataEvent(self, event):
 		self.readData()
