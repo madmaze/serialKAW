@@ -39,14 +39,15 @@ class powerMeter():
 	# init data point counter for wattage plotting
 	avgwattdataidx=0
 	
-	def __init__(self, Calibrate=False, plotGraph=True, debug=False, record=True, powerLogFile="test.log"):
+	def __init__(self, Calibrate=False, plotGraph=True, debug=False, record=True, MonitorOnStart=True, verbose=True, powerLogFile="test.log"):
 		self.CALIBRATE=Calibrate
 		self.plotGraph=plotGraph
 		self.debug=debug
 		self.record=record
-		self.dataLog={}
+		self.dataLog=[]
 		self.logFile=powerLogFile
-		self.monitoring=True
+		self.monitoring=MonitorOnStart
+		self.verbose=verbose
 
 		# average Watt data
 		self.avgwattdata = [0] * 1800 # zero out all the data to start
@@ -108,7 +109,7 @@ class powerMeter():
 							timestep.append(int(s))
 					data.append(timestep)
 		else:
-			print "Skipped packet:",packet
+			print "Skipped packet..."#,packet
 			
 		return data
 	
@@ -209,14 +210,15 @@ class powerMeter():
 			self.voltagewatchline.set_ydata(voltagedata)
 			self.ampwatchline.set_ydata(ampdata)
 		
-		# Debug Info
-		if self.debug:
-			print "\nave Amp(ave/RMS):", aave, aave / self.WaveLength, aRMS
-			print "ave Volt:", vave, vave / self.WaveLength, vmin, vmax
-			print "rms/trueRMS Volt", vmax / math.sqrt(2), vRMS
-			print "ave Watt:", wattAve
-		else:
-			print "Volt/Amp/Watt:", aRMS, vRMS, wattAve 
+		if self.verbose:
+			# Debug Info
+			if self.debug:
+				print "\nave Amp(ave/RMS):", aave, aave / self.WaveLength, aRMS
+				print "ave Volt:", vave, vave / self.WaveLength, vmin, vmax
+				print "rms/trueRMS Volt", vmax / math.sqrt(2), vRMS
+				print "ave Watt:", wattAve
+			else:
+				print "Volt/Amp/Watt:", aRMS, vRMS, wattAve 
 		
 		if self.record:
 			tstamp = datetime.datetime.now()
@@ -238,10 +240,10 @@ class powerMeter():
 			f.write(tstamp.strftime("%Y:%m:%d-%H:%M:%S.%f") + " " + str(aRMS) + " " + str(vRMS) + " " + str(wattAve) + "\n")
 			f.close()
 		else:
-			self.dataLog[str(tstamp.strftime("%Y:%m:%d-%H:%M:%S.%f"))]=(aRMS, vRMS, wattAve)
+			self.dataLog.append((str(tstamp.strftime("%Y:%m:%d-%H:%M:%S.%f")),aRMS, vRMS, wattAve))
 	
 	def clearData(self):
-		self.dataLog = {}
+		self.dataLog = []
 	
 	def stopMonitoring(self):
 		print "stopping to monitor power usage..."
