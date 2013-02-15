@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import time
 
-dataFolder="/home/madmaze/Dropbox/Projects/powerMeter/Analysis/Ion"
+dataFolder="/home/madmaze/Dropbox/Projects/powerMeter/Analysis/CarmaBoard"
 testlog = open(dataFolder+"/test.log","r")
 powerlog = open(dataFolder+"/powerlog.csv","r").readlines()
 foldedlog = open(dataFolder+"/folded.csv","w")
