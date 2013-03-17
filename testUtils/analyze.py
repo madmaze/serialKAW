@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import numpy as np
-
-f = open("Analysis/ZotacIon/test.log","r")
+"""
+Prints out basic statistics of a power log
+"""
+f = open("../Analysis/Board2/test.log","r")
 totalTime=0
 testCnt=0
 times=[]

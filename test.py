@@ -14,27 +14,39 @@ def run(cmd):
 	return buf.strip()
 
 
+# Lets get a powerMeter without the GUI and dont start monitoring immediately
 meter = pm.powerMeter(plotGraph=False,powerLogFile="",MonitorOnStart=False, verbose=False)
-testHostname="ubuntu@carma.pha.jhu.edu"
-#testHostname="madmaze@128.220.147.219"
-#testHostname="madmaze@128.220.147.143"
-testPath="./Code/Benchmark/test.sh"
+
+# testMachine
+testHostname = "user@testmachine"
+testKeys = "~/.ssh/test"
+
+# path to test on testMachine
+testPath = "./Code/Benchmark/test.sh"
+
+# start the monitor and give it time to record a baseline power consumption
 meter.startMonitoring()
 time.sleep(10)
-cmd = "ssh -i /home/madmaze/.ssh/tesla "+testHostname+" '"+testPath+"'"
-print cmd
+
+# run test on remote machine
+cmd = "ssh -i " + testKeys + " " + testHostname + " '" + testPath + "'"
+#print cmd
 run(cmd)
+
+# make sure the test is done then stop monitoring
 time.sleep(10)
 meter.stopMonitoring()
+
+# Get get the power consumption log 
 log = meter.getDataLog()
-#print log
-now=datetime.datetime.now()
-nowstr=now.strftime("%Y%m%d_%H%M%S")
-curdir="./logs/"+nowstr
+
+now = datetime.datetime.now()
+nowstr = now.strftime("%Y%m%d_%H%M%S")
+curdir = "./logs/"+nowstr
 os.mkdir(curdir)
 
+# write out power consumption in CSV
 logFile = curdir+"/powerlog.csv"
-
 f = open(logFile,"a")
 f.write(testHostname+"\n")
 for k in log:
@@ -42,17 +54,21 @@ for k in log:
 	
 f.close()
 
-cmd = "scp -i /home/madmaze/.ssh/tesla "+testHostname+":~/Code/Benchmark/test.log "+curdir+"/test.log"
-print cmd
+# copy back test log from testMachines
+cmd = "scp -i " + testKeys + " "+testHostname+":~/Code/Benchmark/test.log "+curdir+"/test.log"
+#print cmd
 run(cmd)
 
 
-print "Idle run log"
+# record power consumption of testMachine at idle
+#print "Idle run log"
 meter.clearData()
 meter.startMonitoring()
-print "logging..."
+
+#print "logging..."
 time.sleep(130)
 meter.stopMonitoring()
+
 log = meter.getDataLog()
 logFile = curdir+"/idlePowerlog.csv"
 

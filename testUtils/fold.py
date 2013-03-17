@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 import time
+"""
+Experimental code for folding multiple test results
+onto one another to get higher confidence in our numbers
+"""
 
-dataFolder="/home/madmaze/Dropbox/Projects/powerMeter/Analysis/CarmaBoard"
+dataFolder="../Analysis/Test1"
 testlog = open(dataFolder+"/test.log","r")
 powerlog = open(dataFolder+"/powerlog.csv","r").readlines()
 foldedlog = open(dataFolder+"/folded.csv","w")
