@@ -2,6 +2,8 @@ serialKAW
 =========
 Piggyback the Kill-A-Watt's opamp and feed them to the Arduino's ADCs, which are then read out and fired over serial to a python script for plotting 
 
+Here is a quick writeup: http://matthiaslee.com/node/49
+
 **Example Graph:**  
 ![Example Graph](http://imgur.com/QM0Dz.jpg "Example Graph")
 
